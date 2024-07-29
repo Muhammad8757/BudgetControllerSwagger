@@ -1,0 +1,106 @@
+/* Основные стили страницы */
+body {
+    font-family: Arial, sans-serif;
+    background-color: #f4f4f4;
+    margin: 0;
+    padding: 0;
+}
+
+h2 {
+    text-align: center;
+    color: #333;
+}
+
+form {
+    background-color: #fff;
+    max-width: 400px;
+    margin: 50px auto;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+p {
+    margin-bottom: 15px;
+}
+
+a {
+    color: #ffffff;
+    text-decoration: none; /* Убираем подчеркивание по умолчанию */
+    color: inherit; /* Наследуем цвет текста от родительского элемента */
+}
+
+a:hover {
+    color: #ffffff; 
+    text-decoration: underline; /* Добавляем подчеркивание при наведении */
+}
+
+input[type="text"],
+input[type="number"],
+input[type="password"] {
+    width: calc(100% - 20px);
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 16px;
+}
+
+input[type="submit"] {
+    width: 100%;
+    padding: 10px;
+    background-color: #28a745;
+    border: none;
+    border-radius: 4px;
+    color: #fff;
+    font-size: 16px;
+    cursor: pointer;
+}
+
+input[type="submit"]:hover {
+    background-color: #218838;
+}
+
+.form-actions {
+    text-align: center;
+}
+
+.signup-link {
+    display: inline-block;
+    margin-top: 10px;
+    padding: 10px 15px;
+    background-color: #007bff;
+    color: white;
+    text-decoration: none;
+    border-radius: 5px;
+    transition: background-color 0.3s ease;
+}
+
+.signup-link:hover {
+    color: #ffffff; 
+    text-decoration: underline; /* Добавляем подчеркивание при наведении */
+}
+
+.toast {
+    position: absolute;
+    top: 30px;
+    right: 20px;
+    min-width: 150px; /* Ширина уведомления */
+    margin-bottom: 1rem; /* Отступ между уведомлениями */
+    border-radius: .25rem; /* Закругляем углы */
+  }
+
+.error-message {
+    color: red; /* Цвет текста сообщений об ошибках */
+    font-size: 14px; /* Размер шрифта для сообщений об ошибках */
+    margin-top: 5px; /* Отступ сверху */
+    display: block; /* Убедитесь, что элемент отображается как блок для корректного позиционирования */
+    font-weight: bold; /* Сделать текст полужирным для лучшей видимости */
+}
+
+.bg-success {
+    background-color: #28a745;
+}
+
+.bg-danger {
+    background-color: #dc3545;
+}
