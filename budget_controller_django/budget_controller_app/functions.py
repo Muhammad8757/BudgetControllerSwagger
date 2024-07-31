@@ -2,7 +2,7 @@ import hashlib
 from django.http import HttpResponseRedirect
 from django.shortcuts import redirect
 from django.urls import reverse
-from .models import models
+from .models import Category, models
 from .models import User
 
 def hasher(password) -> str:
@@ -21,3 +21,10 @@ def check_user(request):
         login_url = reverse('login')
         return HttpResponseRedirect(f"{login_url}?toast=unauthorized")
     return None
+
+def add_category_id(request, id=None, name=None):
+    if id is None and name is None:
+        name = request.POST.get('categoryName')
+        Category.objects.create(name=name, created_category_by=request.user)
+    elif id is not None and name is not None:
+        Category.objects.create(name=name, created_category_by=id)

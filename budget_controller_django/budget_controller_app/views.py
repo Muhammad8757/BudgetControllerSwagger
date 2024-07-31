@@ -1,7 +1,7 @@
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.authentication import JWTAuthentication
-from .functions import hasher
+from .functions import add_category_id, hasher
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.db.models import Q
 from .serializers import UserSerializer, CategorySerializer, UserTransactionSerializer
@@ -12,10 +12,11 @@ from rest_framework import mixins
 from rest_framework.viewsets import GenericViewSet
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
+from django.contrib.auth.hashers import make_password
+
 
 
 class UserAPIView(mixins.CreateModelMixin,
-                  mixins.RetrieveModelMixin,
                   GenericViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
@@ -25,21 +26,78 @@ class UserAPIView(mixins.CreateModelMixin,
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
         
+        categories = ["Медицина", "Транспорт", "Еда и напитки", "Образование", "Другое"]
+        for category in categories:
+            add_category_id(request, id=user, name=category)
+
         refresh = RefreshToken.for_user(user)
         
         return Response({
             'refresh': str(refresh),
-            'access': str(refresh.access_token),
-            'user': UserSerializer(user).data
+            'access': str(refresh.access_token)
         }, status=status.HTTP_201_CREATED)
+    
+    @swagger_auto_schema(
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                'phone_number': openapi.Schema(type=openapi.TYPE_INTEGER, description='Phone number of the user'),
+                'password': openapi.Schema(type=openapi.TYPE_STRING, description='Password of the user'),
+            },
+            required=['phone_number', 'password']
+        ),
+        responses={
+            200: openapi.Response(
+                description="Successful login",
+                examples={
+                    'application/json': {
+                        'refresh': 'your-refresh-token',
+                        'access': 'your-access-token'
+                    }
+                }
+            ),
+            400: 'Invalid input',
+            404: 'User not found'
+        }
+    )
+    @action(detail=False, methods=["post"])
+    def login(self, request):
+        phone_number = request.data.get('phone_number')
+        password = request.data.get('password')
+
+        if phone_number and password:
+            try:
+                user = User.objects.get(phone_number=phone_number)
+                
+                if user.check_password(password):  # Проверяем правильность пароля
+                    refresh = RefreshToken.for_user(user)
+                    return Response({
+                        'refresh': str(refresh),
+                        'access': str(refresh.access_token)
+                    })
+                else:
+                    return Response({"detail": "Invalid password"}, status=status.HTTP_400_BAD_REQUEST)
+            except User.DoesNotExist:
+                return Response({"detail": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+        else:
+            return Response({"detail": "Phone number and password are required"}, status=status.HTTP_400_BAD_REQUEST)
 
 
 
 class CategoryAPIView(viewsets.ModelViewSet):
-    queryset = Category.objects.all()
     serializer_class = CategorySerializer
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
+    def get_queryset(self):
+        return Category.objects.filter(created_category_by=self.request.user)
+
+    def create(self, request):
+        serializer = CategorySerializer(data=request.data, context={'user': request.user})
+        serializer.is_valid(raise_exception=True)
+        category = serializer.save()
+        return Response(CategorySerializer(category).data, status=status.HTTP_201_CREATED)
+
+    
 
 class UserTransactionAPIView(viewsets.ModelViewSet):
     queryset = UserTransaction.objects.all()
