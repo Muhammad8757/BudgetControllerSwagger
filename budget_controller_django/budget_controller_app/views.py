@@ -1,37 +1,52 @@
 from rest_framework.response import Response
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.permissions import IsAuthenticated
+from rest_framework_simplejwt.authentication import JWTAuthentication
 from .functions import hasher
+from rest_framework_simplejwt.tokens import RefreshToken
 from django.db.models import Q
 from .serializers import UserSerializer, CategorySerializer, UserTransactionSerializer
 from rest_framework.decorators import action
-from django_filters.rest_framework import DjangoFilterBackend
 from .models import User, UserTransaction, Category
-from rest_framework import viewsets, filters, status
+from rest_framework import viewsets, status
 from rest_framework import mixins
 from rest_framework.viewsets import GenericViewSet
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
-from rest_framework.decorators import api_view
+
 
 class UserAPIView(mixins.CreateModelMixin,
                   mixins.RetrieveModelMixin,
                   GenericViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
+    authentication_classes = []
+    def create(self, request):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+        
+        refresh = RefreshToken.for_user(user)
+        
+        return Response({
+            'refresh': str(refresh),
+            'access': str(refresh.access_token),
+            'user': UserSerializer(user).data
+        }, status=status.HTTP_201_CREATED)
 
-    def create(self, request, *args, **kwargs):
-        data = request.data
-        password = data.get('password')
-        data['password'] = hasher(password)
-        return super().create(request, *args, **kwargs)
+
 
 class CategoryAPIView(viewsets.ModelViewSet):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
 
 class UserTransactionAPIView(viewsets.ModelViewSet):
     queryset = UserTransaction.objects.all()
     serializer_class = UserTransactionSerializer
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
 
     @swagger_auto_schema(
         manual_parameters=[
@@ -40,18 +55,6 @@ class UserTransactionAPIView(viewsets.ModelViewSet):
                 in_=openapi.IN_QUERY,
                 type=openapi.TYPE_STRING,
             ),
-            openapi.Parameter(
-                'phone_number',
-                in_=openapi.IN_QUERY,
-                type=openapi.TYPE_INTEGER,
-                required=True
-            ),
-            openapi.Parameter(
-                'password',
-                in_=openapi.IN_QUERY,
-                type=openapi.TYPE_STRING,
-                required=True
-            )
         ]
     )
     @action(detail=False, methods=["get"])
@@ -64,23 +67,6 @@ class UserTransactionAPIView(viewsets.ModelViewSet):
         serializer = UserTransactionSerializer(user_transaction, many=True)
         return Response({"results": serializer.data}, status=status.HTTP_200_OK)
         
-    
-    @swagger_auto_schema(
-        manual_parameters=[
-            openapi.Parameter(
-                'phone_number',
-                in_=openapi.IN_QUERY,
-                type=openapi.TYPE_INTEGER,
-                required=True
-            ),
-            openapi.Parameter(
-                'password',
-                in_=openapi.IN_QUERY,
-                type=openapi.TYPE_STRING,
-                required=True
-            )
-        ]
-    )
     @action(detail=False, methods=["get"])
     def get_balance(self, request):
         phone_number = request.query_params.get('phone_number', None)
@@ -97,4 +83,3 @@ class UserTransactionAPIView(viewsets.ModelViewSet):
             formatted_balance = "{:.5f}".format(total_sum).rstrip('0').rstrip('.')
 
         return Response({"balance": formatted_balance}, status=status.HTTP_200_OK)
-    

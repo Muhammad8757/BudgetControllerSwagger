@@ -6,6 +6,10 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = ['id', 'name', 'phone_number', 'password']
 
+    def create(self, validated_data):
+        user = User.objects.create(**validated_data)
+        return user
+    
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = Category
