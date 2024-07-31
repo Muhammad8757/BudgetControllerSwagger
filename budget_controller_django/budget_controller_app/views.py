@@ -1,7 +1,7 @@
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.authentication import JWTAuthentication
-from .functions import add_category_id, hasher, sorted_transactions
+from .functions import add_category_id, sorted_transactions
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.db.models import Q
 from .serializers import UserSerializer, CategorySerializer, UserTransactionSerializer
@@ -12,7 +12,6 @@ from rest_framework import mixins
 from rest_framework.viewsets import GenericViewSet
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
-from django.contrib.auth.hashers import make_password
 
 
 

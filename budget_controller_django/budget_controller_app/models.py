@@ -26,7 +26,7 @@ class User(AbstractBaseUser):
     objects = UserManager()
 
     USERNAME_FIELD = 'phone_number'
-    REQUIRED_FIELDS = ['name']  # Укажите обязательные поля
+    REQUIRED_FIELDS = ['name']
 
     def __str__(self):
         return self.phone_number

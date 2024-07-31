@@ -1,8 +1,7 @@
 import hashlib
 from django.http import HttpResponseRedirect
-from django.shortcuts import redirect
 from django.urls import reverse
-from .models import Category, UserTransaction, models
+from .models import Category, UserTransaction
 from .models import User
 
 def hasher(password) -> str:
