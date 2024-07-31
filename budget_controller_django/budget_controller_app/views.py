@@ -1,7 +1,7 @@
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.authentication import JWTAuthentication
-from .functions import add_category_id, hasher
+from .functions import add_category_id, hasher, sorted_transactions
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.db.models import Q
 from .serializers import UserSerializer, CategorySerializer, UserTransactionSerializer
@@ -97,14 +97,31 @@ class CategoryAPIView(viewsets.ModelViewSet):
         category = serializer.save()
         return Response(CategorySerializer(category).data, status=status.HTTP_201_CREATED)
 
-    
 
-class UserTransactionAPIView(viewsets.ModelViewSet):
-    queryset = UserTransaction.objects.all()
+
+class UserTransactionAPIView(mixins.RetrieveModelMixin,
+                            mixins.UpdateModelMixin,
+                            mixins.DestroyModelMixin,
+                            mixins.ListModelMixin,
+                            GenericViewSet):
     serializer_class = UserTransactionSerializer
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
+    def get_queryset(self):
+        return UserTransaction.objects.filter(user=self.request.user)
+    
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context['user'] = self.request.user
+        return context
+    
+    def create(self, request):
+        serializer = UserTransactionSerializer(data=request.data, context={'user': request.user})
+        serializer.is_valid(raise_exception=True)
+        transaction = serializer.save()
+        return Response(UserTransactionSerializer(transaction).data, status=status.HTTP_201_CREATED)
+    
 
     @swagger_auto_schema(
         manual_parameters=[
@@ -118,19 +135,14 @@ class UserTransactionAPIView(viewsets.ModelViewSet):
     @action(detail=False, methods=["get"])
     def search_transaction(self, request):
         query = request.query_params.get('query', None)
-        phone_number = request.query_params.get('phone_number', None)
-        password = request.query_params.get('password', None)
-        user = User.objects.get(phone_number=phone_number, password=password)
-        user_transaction = UserTransaction.objects.filter(Q(description__icontains=query) | Q(amount__icontains=query),user=user)
+        user_transaction = UserTransaction.objects.filter(Q(description__icontains=query) | Q(amount__icontains=query),user=request.user)
         serializer = UserTransactionSerializer(user_transaction, many=True)
         return Response({"results": serializer.data}, status=status.HTTP_200_OK)
         
+
     @action(detail=False, methods=["get"])
     def get_balance(self, request):
-        phone_number = request.query_params.get('phone_number', None)
-        password = request.query_params.get('password', None)
-        user = User.objects.get(phone_number=phone_number, password=password)
-        user_transactions = UserTransaction.objects.filter(user=user)
+        user_transactions = UserTransaction.objects.filter(user=request.user)
         sum_zero = sum(item.amount for item in user_transactions if item.type == 0)
         sum_one = sum(item.amount for item in user_transactions if item.type == 1)
         total_sum = sum_one - sum_zero
@@ -141,3 +153,74 @@ class UserTransactionAPIView(viewsets.ModelViewSet):
             formatted_balance = "{:.5f}".format(total_sum).rstrip('0').rstrip('.')
 
         return Response({"balance": formatted_balance}, status=status.HTTP_200_OK)
+    
+
+    @action(detail=False, methods=['get'])
+    def sorted_by_amount(self, request):
+        transactions = sorted_transactions(request, 'amount')
+        serializer = UserTransactionSerializer(transactions, many=True)
+        return Response(
+            {
+                "result": serializer.data
+            }
+        )
+    
+    @action(detail=False, methods=['get'])
+    def sorted_by_type(self, request):
+        transactions = sorted_transactions(request, 'type')
+        serializer = UserTransactionSerializer(transactions, many=True)
+        return Response(
+            {
+                "result": serializer.data
+            }
+        )
+    
+    @action(detail=False, methods=['get'])
+    def sorted_by_category(self, request):
+        transactions = sorted_transactions(request, 'category')
+        serializer = UserTransactionSerializer(transactions, many=True)
+        return Response(
+            {
+                "result": serializer.data
+            }
+        )
+    
+    @action(detail=False, methods=['get'])
+    def sorted_by_date(self, request):
+        transactions = sorted_transactions(request, 'date')
+        serializer = UserTransactionSerializer(transactions, many=True)
+        return Response(
+            {
+                "result": serializer.data
+            }
+        )
+    
+    @action(detail=False, methods=['get'])
+    def sorted_by_description(self, request):
+        transactions = sorted_transactions(request, 'description')
+        serializer = UserTransactionSerializer(transactions, many=True)
+        return Response(
+            {
+                "result": serializer.data
+            }
+        )
+    @swagger_auto_schema(
+        manual_parameters=[
+            openapi.Parameter(
+                'category_id',
+                in_=openapi.IN_QUERY,
+                type=openapi.TYPE_INTEGER,
+            ),
+        ]
+    )
+    @action(detail=False, methods=['get'])
+    def filter_by_category(self, request):
+        choosen_category = request.query_params.get('category_id', None)
+        filter_by_category_result = UserTransaction.objects.filter(user=request.user, category_id=choosen_category)
+        serializer = UserTransactionSerializer(filter_by_category_result, many=True)
+        return Response(
+            {
+                "result": serializer.data
+            }
+        )
+    

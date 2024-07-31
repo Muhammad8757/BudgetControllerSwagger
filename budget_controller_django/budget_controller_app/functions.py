@@ -2,7 +2,7 @@ import hashlib
 from django.http import HttpResponseRedirect
 from django.shortcuts import redirect
 from django.urls import reverse
-from .models import Category, models
+from .models import Category, UserTransaction, models
 from .models import User
 
 def hasher(password) -> str:
@@ -28,3 +28,10 @@ def add_category_id(request, id=None, name=None):
         Category.objects.create(name=name, created_category_by=request.user)
     elif id is not None and name is not None:
         Category.objects.create(name=name, created_category_by=id)
+
+def sorted_transactions(request, sort_field):
+        sort_order = request.session.get('sort_order', 'desc')
+        order = f'-{sort_field}' if sort_order == 'desc' else sort_field
+        transactions = UserTransaction.objects.filter(user=request.user).order_by(order)
+        request.session['sort_order'] = 'asc' if sort_order == 'desc' else 'desc'
+        return transactions
