@@ -11,8 +11,7 @@ from .models import User, UserTransaction, Category
 from rest_framework import status
 from rest_framework import mixins
 from rest_framework.viewsets import GenericViewSet
-from drf_yasg import openapi
-from drf_yasg.utils import swagger_auto_schema
+from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiResponse
 
 
 
@@ -37,24 +36,12 @@ class UserAPIView(mixins.CreateModelMixin,
             'access': str(refresh.access_token)
         }, status=status.HTTP_201_CREATED)
     
-    @swagger_auto_schema(
-        request_body=openapi.Schema(
-            type=openapi.TYPE_OBJECT,
-            properties={
-                'phone_number': openapi.Schema(type=openapi.TYPE_INTEGER, description='Phone number of the user'),
-                'password': openapi.Schema(type=openapi.TYPE_STRING, description='Password of the user'),
-            },
-            required=['phone_number', 'password']
-        ),
+    @extend_schema(
+        request=UserSerializer,
         responses={
-            200: openapi.Response(
-                description="Successful login",
-                examples={
-                    'application/json': {
-                        'refresh': 'your-refresh-token',
-                        'access': 'your-access-token'
-                    }
-                }
+            200: OpenApiResponse(
+                response=UserSerializer,
+                description="Successful login"
             ),
             400: 'Invalid input',
             404: 'User not found'
@@ -134,27 +121,17 @@ class UserTransactionAPIView(mixins.RetrieveModelMixin,
         serializer.is_valid(raise_exception=True)
         transaction = serializer.save()
         return Response(UserTransactionSerializer(transaction).data, status=status.HTTP_201_CREATED)
-    @swagger_auto_schema(
-        manual_parameters=[
-            openapi.Parameter(
-                'query',
-                in_=openapi.IN_QUERY,
-                type=openapi.TYPE_STRING,
-                description='Search query for transactions'
-            ),
-            openapi.Parameter(
-                'sorted_by',
-                in_=openapi.IN_QUERY,
-                type=openapi.TYPE_STRING,
-                description='Field to sort transactions by (e.g., amount, type, category, date, description)'
-            ),
-            openapi.Parameter(
-                'category_id',
-                in_=openapi.IN_QUERY,
-                type=openapi.TYPE_INTEGER,
-                description='Category ID to filter transactions by'
-            ),
-        ]
+    
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(name='query', type=str, description='Search query for transactions', required=False),
+            OpenApiParameter(name='sorted_by', type=str, description='Field to sort transactions by (e.g., amount, type, category, date, description)', required=False),
+            OpenApiParameter(name='category_id', type=int, description='Category ID to filter transactions by', required=False),
+        ],
+        responses={
+            200: UserTransactionSerializer(many=True),
+            400: 'Invalid input'
+        }
     )
     @action(detail=False, methods=['get'])
     def search(self, request):
@@ -173,7 +150,7 @@ class UserTransactionAPIView(mixins.RetrieveModelMixin,
             if sorted_by in ['amount', 'type', 'category', 'date', 'description']:
                 transaction = sorted_transactions(request, sorted_by)
             else:
-                raise serializers.ValidationError("Wrong somethings from this list 'amount', 'type', 'category', 'date', 'description'.")
+                raise serializers.ValidationError("Choose somethings from this list 'amount', 'type', 'category', 'date', 'description'.")
         if query is None and sorted_by is None and category_id is None:
             raise serializers.ValidationError("choose some filter")
         
@@ -187,7 +164,14 @@ class UserTransactionAPIView(mixins.RetrieveModelMixin,
             
         
 
-    
+    @extend_schema(
+        responses={
+            200: OpenApiResponse(
+                response=dict,
+                description='Balance retrieved successfully'
+            ),
+        }
+    )
     @action(detail=False, methods=["get"])
     def get_balance(self, request):
         user_transactions = UserTransaction.objects.filter(user=request.user)

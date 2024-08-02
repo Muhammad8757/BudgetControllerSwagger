@@ -28,7 +28,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'budget_controller_app',
     'rest_framework',
-    'drf_yasg',
+    'drf_spectacular',
 ]
 
 MIDDLEWARE = [
@@ -122,19 +122,24 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.AllowAny',
     ],
-    # "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
 }
 
-SWAGGER_SETTINGS = {
-    'SECURITY_DEFINITIONS': {
-        'BearerAuth': {
-            'type': 'apiKey',
-            'in': 'header',
-            'name': 'Authorization',
-            'description': 'JWT Authorization header using the Bearer scheme. Example: "Authorization: Bearer <token>"'
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Budget Controller API',
+    'DESCRIPTION': 'API for managing user budgets',
+    'VERSION': '1.0.0',
+    'AUTHENTICATION': [
+        {
+            'BEARER_AUTH': {
+                'type': 'http',
+                'scheme': 'bearer',
+                'bearerFormat': 'JWT',
+            }
         }
-    }
+    ],
 }
+
 SECRET_KEY = 'SECRET'
 AUTH_USER_MODEL = 'budget_controller_app.User'
 
