@@ -1,5 +1,6 @@
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from rest_framework import serializers
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from .functions import add_category_id, sorted_transactions
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -7,7 +8,7 @@ from django.db.models import Q
 from .serializers import UserSerializer, CategorySerializer, UserTransactionSerializer
 from rest_framework.decorators import action
 from .models import User, UserTransaction, Category
-from rest_framework import viewsets, status
+from rest_framework import status
 from rest_framework import mixins
 from rest_framework.viewsets import GenericViewSet
 from drf_yasg import openapi
@@ -83,7 +84,11 @@ class UserAPIView(mixins.CreateModelMixin,
 
 
 
-class CategoryAPIView(viewsets.ModelViewSet):
+class CategoryAPIView(mixins.CreateModelMixin,
+                   mixins.RetrieveModelMixin,
+                   mixins.DestroyModelMixin,
+                   mixins.ListModelMixin,
+                   GenericViewSet):
     serializer_class = CategorySerializer
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
@@ -95,18 +100,26 @@ class CategoryAPIView(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         category = serializer.save()
         return Response(CategorySerializer(category).data, status=status.HTTP_201_CREATED)
+    
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
+    
 
 
 
 class UserTransactionAPIView(mixins.RetrieveModelMixin,
-                            mixins.UpdateModelMixin,
                             mixins.DestroyModelMixin,
+                            mixins.UpdateModelMixin,
                             mixins.ListModelMixin,
                             GenericViewSet):
     serializer_class = UserTransactionSerializer
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
-
+        
     def get_queryset(self):
         return UserTransaction.objects.filter(user=self.request.user)
     
@@ -114,31 +127,67 @@ class UserTransactionAPIView(mixins.RetrieveModelMixin,
         context = super().get_serializer_context()
         context['user'] = self.request.user
         return context
+
     
     def create(self, request):
         serializer = UserTransactionSerializer(data=request.data, context={'user': request.user})
         serializer.is_valid(raise_exception=True)
         transaction = serializer.save()
         return Response(UserTransactionSerializer(transaction).data, status=status.HTTP_201_CREATED)
-    
-
     @swagger_auto_schema(
         manual_parameters=[
             openapi.Parameter(
                 'query',
                 in_=openapi.IN_QUERY,
                 type=openapi.TYPE_STRING,
+                description='Search query for transactions'
+            ),
+            openapi.Parameter(
+                'sorted_by',
+                in_=openapi.IN_QUERY,
+                type=openapi.TYPE_STRING,
+                description='Field to sort transactions by (e.g., amount, type, category, date, description)'
+            ),
+            openapi.Parameter(
+                'category_id',
+                in_=openapi.IN_QUERY,
+                type=openapi.TYPE_INTEGER,
+                description='Category ID to filter transactions by'
             ),
         ]
     )
-    @action(detail=False, methods=["get"])
-    def search_transaction(self, request):
+    @action(detail=False, methods=['get'])
+    def search(self, request):
         query = request.query_params.get('query', None)
-        user_transaction = UserTransaction.objects.filter(Q(description__icontains=query) | Q(amount__icontains=query),user=request.user)
-        serializer = UserTransactionSerializer(user_transaction, many=True)
-        return Response({"results": serializer.data}, status=status.HTTP_200_OK)
+        sorted_by = request.query_params.get('sorted_by', None)
+        category_id = request.query_params.get('category_id', None)
+        transaction = UserTransaction.objects.filter(user=request.user)
+
+        if query:
+            transaction = transaction.filter(Q(description__icontains=query) | Q(amount__icontains=query))
+        
+        if category_id:
+            transaction = transaction.filter(category=category_id)
+        
+        if sorted_by:
+            if sorted_by in ['amount', 'type', 'category', 'date', 'description']:
+                transaction = sorted_transactions(request, sorted_by)
+            else:
+                raise serializers.ValidationError("Wrong somethings from this list 'amount', 'type', 'category', 'date', 'description'.")
+        if query is None and sorted_by is None and category_id is None:
+            raise serializers.ValidationError("choose some filter")
+        
+        serializer = UserTransactionSerializer(transaction, many=True)
+        return Response(
+            {
+                'results': serializer.data
+            }, 
+            status=status.HTTP_200_OK
+        )
+            
         
 
+    
     @action(detail=False, methods=["get"])
     def get_balance(self, request):
         user_transactions = UserTransaction.objects.filter(user=request.user)
@@ -152,74 +201,4 @@ class UserTransactionAPIView(mixins.RetrieveModelMixin,
             formatted_balance = "{:.5f}".format(total_sum).rstrip('0').rstrip('.')
 
         return Response({"balance": formatted_balance}, status=status.HTTP_200_OK)
-    
-
-    @action(detail=False, methods=['get'])
-    def sorted_by_amount(self, request):
-        transactions = sorted_transactions(request, 'amount')
-        serializer = UserTransactionSerializer(transactions, many=True)
-        return Response(
-            {
-                "result": serializer.data
-            }
-        )
-    
-    @action(detail=False, methods=['get'])
-    def sorted_by_type(self, request):
-        transactions = sorted_transactions(request, 'type')
-        serializer = UserTransactionSerializer(transactions, many=True)
-        return Response(
-            {
-                "result": serializer.data
-            }
-        )
-    
-    @action(detail=False, methods=['get'])
-    def sorted_by_category(self, request):
-        transactions = sorted_transactions(request, 'category')
-        serializer = UserTransactionSerializer(transactions, many=True)
-        return Response(
-            {
-                "result": serializer.data
-            }
-        )
-    
-    @action(detail=False, methods=['get'])
-    def sorted_by_date(self, request):
-        transactions = sorted_transactions(request, 'date')
-        serializer = UserTransactionSerializer(transactions, many=True)
-        return Response(
-            {
-                "result": serializer.data
-            }
-        )
-    
-    @action(detail=False, methods=['get'])
-    def sorted_by_description(self, request):
-        transactions = sorted_transactions(request, 'description')
-        serializer = UserTransactionSerializer(transactions, many=True)
-        return Response(
-            {
-                "result": serializer.data
-            }
-        )
-    @swagger_auto_schema(
-        manual_parameters=[
-            openapi.Parameter(
-                'category_id',
-                in_=openapi.IN_QUERY,
-                type=openapi.TYPE_INTEGER,
-            ),
-        ]
-    )
-    @action(detail=False, methods=['get'])
-    def filter_by_category(self, request):
-        choosen_category = request.query_params.get('category_id', None)
-        filter_by_category_result = UserTransaction.objects.filter(user=request.user, category_id=choosen_category)
-        serializer = UserTransactionSerializer(filter_by_category_result, many=True)
-        return Response(
-            {
-                "result": serializer.data
-            }
-        )
     

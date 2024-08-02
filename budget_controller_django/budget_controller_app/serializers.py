@@ -28,6 +28,12 @@ class CategorySerializer(serializers.ModelSerializer):
         category.save()
         return category
     
+    def update(self, instance, validated_data):    
+        instance.name = validated_data.get('name', instance.name)
+        instance.save()
+        
+        return instance
+    
 class UserTransactionSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserTransaction
@@ -37,6 +43,9 @@ class UserTransactionSerializer(serializers.ModelSerializer):
         super().__init__(*args, **kwargs)
         self.fields['description'].required = False
         self.fields['category'].required = False
+        self.fields['description'].default = ''
+        self.fields['category'].default = None
+
 
     def validate(self, data):
         user = self.context['user']
@@ -69,18 +78,10 @@ class UserTransactionSerializer(serializers.ModelSerializer):
         return transaction
     
     def update(self, instance, validated_data):
-    
-        user = self.context.get('user')
-        if user is None:
-            raise serializers.ValidationError("User must be provided in the context.")
-        
-    
         instance.amount = validated_data.get('amount', instance.amount)
+        instance.description = validated_data.get('description', instance.description)
+        instance.type = validated_data.get('type', instance.type)
         instance.category = validated_data.get('category', instance.category)
-        instance.description = validated_data.get('description', instance.category)
-        instance.type = validated_data.get('type', instance.category)
-        
-    
         instance.save()
-        
         return instance
+    

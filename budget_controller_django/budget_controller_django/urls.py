@@ -8,7 +8,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 schema_view = get_schema_view(
     openapi.Info(
-        title="Budger controller api",
+        title="Budget Controller API",
         default_version='v1',
     ),
     public=True,
